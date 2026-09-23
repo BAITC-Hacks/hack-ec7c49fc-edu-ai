@@ -24,6 +24,7 @@ export interface MeasureSearchDefinition {
   id: string;
   direction: Direction;
   scope: "city" | "district";
+  cost: number;
 }
 
 export type SimulateScenario = (input: ScenarioInput) => SimulationResult;

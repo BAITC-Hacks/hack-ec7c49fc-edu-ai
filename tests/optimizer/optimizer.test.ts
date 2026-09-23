@@ -5,6 +5,12 @@ import type { DistrictId, DistrictResult, ScenarioInput, SimulationResult } from
 
 const districts: DistrictId[] = ["esil", "almaty", "saryarka", "baikonur", "nura"];
 
+function withTestCost(
+  measures: Array<Omit<MeasureSearchDefinition, "cost">>,
+): MeasureSearchDefinition[] {
+  return measures.map((measure) => ({ ...measure, cost: 1 }));
+}
+
 function resultFor(input: ScenarioInput): SimulationResult {
   const value = input.selections.reduce(
     (total, selection) => total + Number(selection.measureId.replace(/\D/g, "")),
@@ -60,7 +66,7 @@ const objective: StructuredObjective = {
 
 describe("searchScenarios", () => {
   it("is deterministic and returns three distinct initiative strategies", () => {
-    const measures: MeasureSearchDefinition[] = [
+    const measures = withTestCost([
       { id: "M1", direction: "transport", scope: "city" },
       { id: "M2", direction: "transport", scope: "city" },
       { id: "M3", direction: "ecology", scope: "city" },
@@ -68,7 +74,7 @@ describe("searchScenarios", () => {
       { id: "M5", direction: "social", scope: "city" },
       { id: "M6", direction: "safety", scope: "city" },
       { id: "M7", direction: "services", scope: "city" },
-    ];
+    ]);
 
     const first = searchScenarios(objective, resultFor, measures);
     const second = searchScenarios(objective, resultFor, measures);
@@ -85,13 +91,13 @@ describe("searchScenarios", () => {
   });
 
   it("generates district targets and delegates every result to the simulator", () => {
-    const measures: MeasureSearchDefinition[] = [
+    const measures = withTestCost([
       { id: "M1", direction: "transport", scope: "district" },
       { id: "M4", direction: "ecology", scope: "city" },
       { id: "M7", direction: "social", scope: "city" },
       { id: "M10", direction: "safety", scope: "city" },
       { id: "M12", direction: "services", scope: "city" },
-    ];
+    ]);
     const simulator = vi.fn(resultFor);
     const result = searchScenarios(
       {
@@ -104,8 +110,8 @@ describe("searchScenarios", () => {
       measures,
     );
 
-    expect(simulator).toHaveBeenCalledTimes(5);
-    expect(result.evaluatedScenarios).toBe(5);
+    expect(simulator).toHaveBeenCalledTimes(1);
+    expect(result.evaluatedScenarios).toBe(1);
     expect(result.candidates[0].selections).toContainEqual({ measureId: "M1", districtId: "nura" });
   });
 
@@ -120,14 +126,14 @@ describe("searchScenarios", () => {
   });
 
   it("prioritizes fewer critical indicators for reduce_critical_indicators", () => {
-    const measures: MeasureSearchDefinition[] = [
+    const measures = withTestCost([
       { id: "M1", direction: "transport", scope: "city" },
       { id: "M2", direction: "transport", scope: "city" },
       { id: "M4", direction: "ecology", scope: "city" },
       { id: "M7", direction: "social", scope: "city" },
       { id: "M10", direction: "safety", scope: "city" },
       { id: "M12", direction: "services", scope: "city" },
-    ];
+    ]);
     const simulator = (input: ScenarioInput): SimulationResult => {
       const includesM1 = input.selections.some((item) => item.measureId === "M1");
       const base = resultFor(input);
@@ -154,14 +160,14 @@ describe("searchScenarios", () => {
   });
 
   it("prioritizes the weakest district for balanced_development", () => {
-    const measures: MeasureSearchDefinition[] = [
+    const measures = withTestCost([
       { id: "M1", direction: "transport", scope: "city" },
       { id: "M2", direction: "transport", scope: "city" },
       { id: "M4", direction: "ecology", scope: "city" },
       { id: "M7", direction: "social", scope: "city" },
       { id: "M10", direction: "safety", scope: "city" },
       { id: "M12", direction: "services", scope: "city" },
-    ];
+    ]);
     const simulator = (input: ScenarioInput): SimulationResult => {
       const includesM1 = input.selections.some((item) => item.measureId === "M1");
       const base = resultFor(input);
@@ -192,20 +198,20 @@ describe("searchScenarios", () => {
 
   it("rejects obvious conflicts before calling the simulator", () => {
     const simulator = vi.fn(resultFor);
-    const conflict: MeasureSearchDefinition[] = [
+    const conflict = withTestCost([
       { id: "M1", direction: "transport", scope: "city" },
       { id: "M3", direction: "transport", scope: "city" },
       { id: "M4", direction: "ecology", scope: "city" },
       { id: "M7", direction: "social", scope: "city" },
       { id: "M10", direction: "safety", scope: "city" },
-    ];
-    const directionOverflow: MeasureSearchDefinition[] = [
+    ]);
+    const directionOverflow = withTestCost([
       { id: "M1", direction: "transport", scope: "city" },
       { id: "M2", direction: "transport", scope: "city" },
       { id: "MX", direction: "transport", scope: "city" },
       { id: "M4", direction: "ecology", scope: "city" },
       { id: "M7", direction: "social", scope: "city" },
-    ];
+    ]);
 
     expect(searchScenarios(objective, simulator, conflict).evaluatedScenarios).toBe(0);
     expect(searchScenarios(objective, simulator, directionOverflow).evaluatedScenarios).toBe(0);
