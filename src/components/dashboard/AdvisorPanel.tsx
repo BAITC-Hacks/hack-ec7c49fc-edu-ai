@@ -94,7 +94,7 @@ export default function AdvisorPanel({ selections, currentResult, selectedCandid
       if (!res.ok) {
         throw new Error(res.status === 400
           ? "Проверьте цель: допустимо от 1 до 2000 символов."
-          : res.status === 503
+          : res.status === 500
             ? "Советник временно недоступен. Ручной расчёт продолжает работать."
             : "Не удалось подобрать сценарии. Повторите запрос.");
       }

@@ -48,7 +48,18 @@ Invalid current plans have no outcome comparisons; candidates can still be retur
 
 ## Errors
 
-- `400` with `{ "error": string }` for invalid JSON or request input.
-- `500` with `{ "error": "Advisor failed." }` for an unexpected advisor failure.
+### Requirements
 
-The API has deterministic parsing and explanation fallbacks when `OPENAI_API_KEY` is absent or the OpenAI request fails.
+| Status | Body | When |
+| --- | --- | --- |
+| `400` | `{ "error": "Request body must be valid JSON." }` | Body is not valid JSON |
+| `400` | `{ "error": "message is required and must be at most 2000 characters." }` | Missing/empty `message`, `message` longer than 2000 chars, or invalid `currentScenario` |
+| `500` | `{ "error": "Advisor failed." }` | Unexpected failure inside the advisor runner |
+
+There is no dedicated `503` response today. OpenAI outage or a missing `OPENAI_API_KEY` is **not** an HTTP error: the route still returns `200` with candidates, using deterministic objective parsing and explanation fallbacks. Provider details must never leak into the JSON body.
+
+Frontend mapping expectations:
+
+- non-2xx → show `error` string, keep the user's goal text for retry;
+- `200` with empty `candidates` → valid empty state;
+- manual scenario calculation must keep working even when the advisor request fails.

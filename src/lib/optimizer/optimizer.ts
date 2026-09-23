@@ -150,20 +150,31 @@ function strategySignature(selections: readonly SelectedMeasure[]): string {
   return selections.map((selection) => selection.measureId).sort().join("|");
 }
 
+const DISTRICT_LABELS: Record<string, string> = {
+  esil: "Есиль",
+  almaty: "Алматы",
+  saryarka: "Сарыарка",
+  baikonur: "Байконур",
+  nura: "Нура",
+};
+
 function reasonFor(candidate: ScenarioCandidate, objective: StructuredObjective): string {
   switch (objective.objective) {
     case "improve_district": {
       const district = districtResult(candidate, objective.districtId);
-      return district
-        ? `Improves ${district.districtId} by ${district.scoreDelta.toFixed(2)} points.`
-        : "Improves the requested district.";
+      if (!district) return "Улучшает выбранный район.";
+      const name = DISTRICT_LABELS[district.districtId] ?? district.districtId;
+      return `Улучшает район ${name} на ${district.scoreDelta.toFixed(2)} балла.`;
     }
     case "reduce_critical_indicators":
-      return `Reduces critical indicators from ${candidate.result.criticalBefore} to ${candidate.result.criticalAfter}.`;
-    case "balanced_development":
-      return `Raises the weakest remaining district, ${candidate.result.weakestDistrict}.`;
+      return `Снижает критические показатели с ${candidate.result.criticalBefore} до ${candidate.result.criticalAfter}.`;
+    case "balanced_development": {
+      const weakest = candidate.result.weakestDistrict;
+      const name = weakest ? (DISTRICT_LABELS[weakest] ?? weakest) : "слабейший район";
+      return `Подтягивает самый слабый район: ${name}.`;
+    }
     default:
-      return `Achieves a city score of ${candidate.result.scoreAfter.toFixed(2)}.`;
+      return `Доводит общий Score города до ${candidate.result.scoreAfter.toFixed(2)}.`;
   }
 }
 
