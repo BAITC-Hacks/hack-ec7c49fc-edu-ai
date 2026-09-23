@@ -20,8 +20,25 @@ function resultFor(input: ScenarioInput): SimulationResult {
       indicators: [{ indicator: "S1", before: 35, after: 35 + targeted, delta: targeted }],
     };
   });
+
+  if (input.selections.some((selection) => selection.measureId === "M0")) {
+    return {
+      valid: false,
+      validationErrors: ["Invalid test scenario."],
+      cost: value,
+      remainingBudget: 100 - value,
+      scoreBefore: 50,
+      scoreAfter: null,
+      scoreDelta: null,
+      weakestDistrict: null,
+      criticalBefore: 1,
+      criticalAfter: null,
+      districts: [],
+    };
+  }
+
   return {
-    valid: !input.selections.some((selection) => selection.measureId === "M0"),
+    valid: true,
     validationErrors: [],
     cost: value,
     remainingBudget: 100 - value,
@@ -114,6 +131,7 @@ describe("searchScenarios", () => {
     const simulator = (input: ScenarioInput): SimulationResult => {
       const includesM1 = input.selections.some((item) => item.measureId === "M1");
       const base = resultFor(input);
+      if (!base.valid) return base;
       return {
         ...base,
         criticalAfter: includesM1 ? 0 : 2,
@@ -147,6 +165,7 @@ describe("searchScenarios", () => {
     const simulator = (input: ScenarioInput): SimulationResult => {
       const includesM1 = input.selections.some((item) => item.measureId === "M1");
       const base = resultFor(input);
+      if (!base.valid) return base;
       return {
         ...base,
         scoreAfter: includesM1 ? 51 : 99,
