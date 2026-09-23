@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import type { DistrictId, ScenarioInput, SimulationResult } from "@/types/domain";
+import { useState } from "react";
+import type { DistrictId, ScenarioCandidate, SelectedMeasure, SimulationResult } from "@/types/domain";
+import { MEASURES } from "@/data/astana-track-data";
 import { getBaseline, simulateScenario } from "@/lib/simulation";
 import ScenarioBuilder from "@/components/scenario/ScenarioBuilder";
 import SimulationResults from "./SimulationResults";
+import AdvisorPanel from "./AdvisorPanel";
 import { districts, indicators, totalBudget } from "./districts";
 import styles from "./dashboard.module.css";
 
@@ -17,14 +19,23 @@ const baseline = getBaseline();
 
 export default function Dashboard() {
   const [selectedDistrictId, setSelectedDistrictId] = useState<DistrictId>("nura");
-  const [scenarioSummary, setScenarioSummary] = useState({ count: 0, usedBudget: 0 });
+  const [selections, setSelections] = useState<SelectedMeasure[]>([]);
+  const [advisorCandidate, setAdvisorCandidate] = useState<ScenarioCandidate | null>(null);
+  const scenarioSummary = {
+    count: selections.length,
+    usedBudget: selections.reduce((total, item) => total + (MEASURES.find((measure) => measure.id === item.measureId)?.cost ?? 0), 0),
+  };
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const calculated = result?.valid ? result : null;
-  const clearResult = useCallback(() => { setResult(null); setError(null); }, []);
-  const calculate = (input: ScenarioInput) => {
+  const changeSelections = (nextSelections: SelectedMeasure[]) => {
+    setSelections(nextSelections);
+    setResult(null);
+    setError(null);
+  };
+  const calculate = () => {
     try {
-      setResult(simulateScenario(input));
+      setResult(simulateScenario({ selections }));
       setError(null);
     } catch {
       setResult(null);
@@ -158,8 +169,9 @@ export default function Dashboard() {
             <p className={styles.detailFoot}>Шкала 0–100. Чем выше показатель, тем лучше.</p>
           </section>
         </div>
-        <ScenarioBuilder initialDistrictId={selectedDistrictId} onChange={setScenarioSummary} onScenarioChange={clearResult} onCalculate={calculate} />
+        <ScenarioBuilder initialDistrictId={selectedDistrictId} selections={selections} onChange={changeSelections} onCalculate={calculate} />
         <SimulationResults result={result} error={error} selectedDistrictId={selectedDistrictId} />
+        <AdvisorPanel selections={selections} selectedCandidate={advisorCandidate} onCandidateChange={setAdvisorCandidate} />
       </div>
     </main>
   );
