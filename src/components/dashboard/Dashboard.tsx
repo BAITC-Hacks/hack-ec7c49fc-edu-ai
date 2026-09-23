@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DistrictId } from "@/types/domain";
+import ScenarioBuilder from "@/components/scenario/ScenarioBuilder";
 import { baselineScore, districts, indicators, totalBudget } from "./districts";
 import styles from "./dashboard.module.css";
 
@@ -12,7 +13,9 @@ const numberFormat = new Intl.NumberFormat("ru-RU", {
 
 export default function Dashboard() {
   const [selectedDistrictId, setSelectedDistrictId] = useState<DistrictId>("nura");
+  const [scenarioSummary, setScenarioSummary] = useState({ count: 0, usedBudget: 0 });
   const selectedDistrict = districts.find((district) => district.id === selectedDistrictId) ?? districts[4];
+  const remainingBudget = totalBudget - scenarioSummary.usedBudget;
   const sortedIndicators = [...indicators].sort(
     (a, b) => selectedDistrict.values[a.id] - selectedDistrict.values[b.id],
   );
@@ -51,13 +54,13 @@ export default function Dashboard() {
           </div>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Бюджет</span>
-            <strong>{totalBudget}<span> ед.</span></strong>
-            <span className={styles.metricHint}>Доступно для сценария</span>
+            <strong>{remainingBudget}<span> ед.</span></strong>
+            <span className={styles.metricHint}>Остаток: использовано {scenarioSummary.usedBudget}</span>
           </div>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Решения</span>
-            <strong>0 <span>/ 5</span></strong>
-            <span className={styles.metricHint}>Пока не выбраны</span>
+            <strong>{scenarioSummary.count} <span>/ 5</span></strong>
+            <span className={styles.metricHint}>{scenarioSummary.count === 5 ? "Сценарий готов к расчёту" : "Выберите ещё мероприятия"}</span>
           </div>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Критические показатели</span>
@@ -138,6 +141,7 @@ export default function Dashboard() {
             <p className={styles.detailFoot}>Шкала 0–100. Чем выше показатель, тем лучше.</p>
           </section>
         </div>
+        <ScenarioBuilder initialDistrictId={selectedDistrictId} onChange={setScenarioSummary} />
       </div>
     </main>
   );
