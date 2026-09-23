@@ -35,13 +35,14 @@ const DISTRICT_ALIASES: ReadonlyArray<[DistrictId, RegExp]> = [
   ["saryarka", /(?:saryarka|sary-arka|сарыарка)/iu],
   ["baikonur", /(?:baikonur|байконур)/iu],
   ["almaty", /(?:almaty|алматы)/iu],
-  ["nura", /(?:nura|нура)/iu],
+  ["nura", /(?:nura|нуру|нура|нуре|нуры)/iu],
   ["esil", /(?:esil|есил|есиль)/iu],
 ];
 
 const INDICATOR_HINTS: ReadonlyArray<[IndicatorId[], RegExp]> = [
   [["T1", "T2"], /transport|traffic|congestion|public transport|транспорт|пробк/iu],
   [["E1", "E2"], /ecolog|green|air|эколог|озелен|воздух/iu],
+  [["S1", "S2"], /social|социальн/iu],
   [["S1"], /school|kindergarten|школ|детск(?:ий|ого) сад/iu],
   [["S2"], /clinic|health|поликлиник|здравоохран/iu],
   [["B1", "B2"], /safety|безопас/iu],
@@ -51,6 +52,13 @@ const INDICATOR_HINTS: ReadonlyArray<[IndicatorId[], RegExp]> = [
 export function validateStructuredObjective(value: unknown): StructuredObjective | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
+  const allowedKeys = new Set([
+    "objective",
+    "districtId",
+    "focusIndicators",
+    "reduceCritical",
+  ]);
+  if (Object.keys(candidate).some((key) => !allowedKeys.has(key))) return null;
   if (!OBJECTIVES.includes(candidate.objective as ObjectiveKind)) return null;
   const districtId = candidate.districtId;
   if (districtId != null && !DISTRICTS.includes(districtId as DistrictId)) return null;
@@ -58,6 +66,7 @@ export function validateStructuredObjective(value: unknown): StructuredObjective
   if (!candidate.focusIndicators.every((item) => INDICATORS.includes(item as IndicatorId))) return null;
   if (typeof candidate.reduceCritical !== "boolean") return null;
   if (candidate.objective === "improve_district" && districtId == null) return null;
+  if (candidate.objective !== "improve_district" && districtId != null) return null;
 
   return {
     objective: candidate.objective as ObjectiveKind,

@@ -26,6 +26,7 @@ export async function createOpenAIResponse(
 
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(8_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
