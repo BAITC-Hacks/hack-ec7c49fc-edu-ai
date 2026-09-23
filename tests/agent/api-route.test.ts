@@ -24,7 +24,7 @@ describe("POST /api/advisor", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns a clear temporary status while the simulation stub is active", async () => {
+  it("uses the integrated simulation engine", async () => {
     const response = await POST(
       new Request("http://localhost/api/advisor", {
         method: "POST",
@@ -34,11 +34,18 @@ describe("POST /api/advisor", () => {
       }),
     );
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: "Simulation engine is not available yet.",
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      interpretedGoal: {
+        objective: "improve_district",
+        districtId: "nura",
+        focusIndicators: ["S1", "S2"],
+        reduceCritical: true,
+      },
+      candidates: expect.any(Array),
+      explanation: expect.any(String),
     });
-  });
+  }, 30_000);
 
   it("preserves the frontend response contract", async () => {
     const expected = {
