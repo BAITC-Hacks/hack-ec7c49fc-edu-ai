@@ -1,0 +1,70 @@
+:global(*) { box-sizing: border-box; }
+:global(html) { background: #f4f6f8; }
+:global(body) { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1b2832; }
+:global(button) { font: inherit; }
+
+.app { min-height: 100vh; background: #f4f6f8; }
+.header { height: 68px; background: #fff; border-bottom: 1px solid #dfe5e9; display: flex; align-items: center; justify-content: space-between; padding: 0 34px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brandMark { width: 37px; height: 37px; display: grid; place-items: center; background: #127d78; color: #fff; font-size: 22px; font-weight: 800; border-radius: 6px; }
+.brandName { font-size: 15px; font-weight: 800; letter-spacing: .08em; }
+.brandDescription { margin-top: 2px; color: #75838d; font-size: 11px; }
+.headerRight { display: flex; align-items: center; gap: 9px; color: #657681; font-size: 13px; }
+.liveDot { width: 8px; height: 8px; border-radius: 50%; background: #18a879; }
+.content { max-width: 1510px; padding: 36px 34px 64px; margin: 0 auto; }
+.titleRow { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 29px; }
+.eyebrow, .detailEyebrow { color: #127d78; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.eyebrow { margin: 0 0 9px; }
+.titleRow h1 { margin: 0; font-size: 31px; line-height: 1.17; font-weight: 750; }
+.subtitle { margin: 9px 0 0; color: #6e7e88; font-size: 14px; }
+.period { color: #647680; font-size: 12px; padding-bottom: 3px; white-space: nowrap; }
+.metrics { display: grid; grid-template-columns: 1.55fr repeat(3, 1fr); gap: 13px; margin-bottom: 24px; }
+.scoreMetric, .metric { min-height: 151px; display: flex; flex-direction: column; align-items: flex-start; background: #fff; border: 1px solid #e1e6e9; border-radius: 6px; padding: 19px 22px; }
+.scoreMetric { background: #123d45; border-color: #123d45; color: #fff; }
+.metricLabel { font-size: 11px; font-weight: 750; letter-spacing: .07em; color: #71838c; text-transform: uppercase; }
+.scoreMetric .metricLabel { color: #a7c7c7; }
+.bigScore { margin-top: 13px; font-size: 42px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
+.bigScore span { font-size: 16px; font-weight: 400; color: #a7c7c7; }
+.metric strong { margin-top: 16px; font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums; }
+.metric strong span { font-size: 15px; font-weight: 400; color: #8a969f; }
+.metric .criticalNumber { color: #b34c40; }
+.metricHint { margin-top: auto; color: #8b99a1; font-size: 12px; }
+.scoreMetric .metricHint { color: #a7c7c7; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1.42fr) minmax(340px, 1fr); gap: 20px; align-items: start; }
+.districtsSection, .detailSection { background: #fff; border: 1px solid #dfe5e9; border-radius: 6px; overflow: hidden; }
+.sectionHeading { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 22px 24px 18px; }
+.sectionHeading h2, .detailHead h2 { margin: 0; font-size: 19px; line-height: 1.2; }
+.sectionHeading p { margin: 6px 0 0; color: #84919a; font-size: 12px; }
+.sectionCount { font-size: 11px; color: #70818a; white-space: nowrap; }
+.districtList { border-top: 1px solid #e9edef; }
+.districtRow { width: 100%; display: grid; grid-template-columns: minmax(165px, 1.4fr) minmax(90px, 1fr) 64px; align-items: center; gap: 20px; min-height: 83px; padding: 13px 24px; border: 0; border-bottom: 1px solid #edf0f2; background: #fff; color: inherit; text-align: left; cursor: pointer; }
+.districtRow:hover { background: #f7faf9; }
+.districtRow:focus-visible { outline: 3px solid #127d78; outline-offset: -3px; }
+.districtRowSelected { background: #eaf5f2; box-shadow: inset 3px 0 #168c78; }
+.districtRowSelected:hover { background: #e5f2ee; }
+.districtNameGroup { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.districtNameGroup strong { font-size: 14px; }
+.districtNameGroup > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #7d8b94; }
+.districtBar, .indicatorTrack { display: block; height: 7px; border-radius: 8px; background: #e7ecee; overflow: hidden; }
+.districtBar > span, .indicatorTrack > span { display: block; height: 100%; border-radius: inherit; background: #168c78; }
+.districtRow:last-child .districtBar > span { background: #cc8b4a; }
+.districtScore { text-align: right; font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.note { display: flex; align-items: center; gap: 10px; padding: 17px 24px; color: #788891; font-size: 11px; line-height: 1.45; }
+.noteMark { flex: 0 0 auto; width: 17px; height: 17px; border: 1px solid #aebdc4; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+.detailSection { padding: 22px 24px 20px; }
+.detailHead { display: flex; justify-content: space-between; align-items: end; gap: 12px; }
+.detailHead h2 { margin-top: 8px; }
+.population { color: #7c8c95; font-size: 11px; white-space: nowrap; }
+.detailScore { margin: 19px 0 16px; display: flex; align-items: baseline; gap: 11px; }
+.detailScore strong { font-size: 32px; font-variant-numeric: tabular-nums; }
+.detailScore span { color: #82919a; font-size: 12px; }
+.indicatorList { border-top: 1px solid #e8ecee; }
+.indicatorRow { padding-top: 13px; }
+.indicatorText { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+.indicatorText strong { font-size: 12px; font-variant-numeric: tabular-nums; }
+.indicatorText .dangerText { color: #b34c40; }
+.indicatorTrack { height: 5px; }
+.indicatorTrack .dangerBar { background: #c66c5e; }
+.detailFoot { margin: 20px 0 0; color: #87959d; font-size: 11px; }
+@media (max-width: 1050px) { .metrics { grid-template-columns: repeat(2, 1fr); } .workspace { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .header { padding: 0 18px; } .headerRight { display: none; } .content { padding: 24px 16px 40px; } .titleRow { align-items: start; flex-direction: column; } .titleRow h1 { font-size: 27px; } .metrics { gap: 9px; } .scoreMetric, .metric { padding: 16px; min-height: 130px; } .bigScore { font-size: 33px; } .metric strong { font-size: 27px; } .metricLabel { font-size: 10px; } .districtRow { grid-template-columns: minmax(0, 1fr) 55px; gap: 10px; padding: 12px 16px; } .districtBar { display: none; } .sectionHeading, .detailSection { padding-left: 16px; padding-right: 16px; } }
