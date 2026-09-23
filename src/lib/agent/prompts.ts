@@ -8,9 +8,39 @@ a district. Supported districts: esil, almaty, saryarka, baikonur, nura.`;
 
 export function explanationInstructions(): string {
   return `You explain already-calculated urban planning alternatives.
-Use only the facts supplied by the application. Do not calculate, infer, round differently,
-or introduce any number. Explain goal fit, budget, score improvement, weakest remaining
-district, critical indicators, trade-offs, and how alternatives differ. Be concise.`;
+Return the requested structured object. For each alternative, write a concise qualitative
+goal-fit statement and trade-off. Do not use digits or number words. Do not calculate,
+infer, round, or restate numeric values. The application will attach all numeric facts itself.
+Use only the supplied facts and keep the array in the supplied alternative order.`;
+}
+
+export function explanationFormat(candidateCount: number): Record<string, unknown> {
+  return {
+    type: "json_schema",
+    name: "scenario_explanations",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        summaries: {
+          type: "array",
+          minItems: candidateCount,
+          maxItems: candidateCount,
+          items: {
+            type: "object",
+            properties: {
+              goalFit: { type: "string" },
+              tradeoff: { type: "string" },
+            },
+            required: ["goalFit", "tradeoff"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["summaries"],
+      additionalProperties: false,
+    },
+  };
 }
 
 export function explanationInput(
@@ -18,7 +48,7 @@ export function explanationInput(
   candidates: readonly ScenarioCandidate[],
 ): string {
   const facts = candidates.map((candidate, index) => ({
-    alternative: index + 1,
+    alternative: String.fromCharCode(65 + index),
     selections: candidate.selections,
     cost: candidate.result.cost,
     remainingBudget: candidate.result.remainingBudget,

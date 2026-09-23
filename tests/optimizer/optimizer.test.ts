@@ -101,4 +101,95 @@ describe("searchScenarios", () => {
       ),
     ).toThrow("requires districtId");
   });
+
+  it("prioritizes fewer critical indicators for reduce_critical_indicators", () => {
+    const measures: MeasureSearchDefinition[] = [
+      { id: "M1", direction: "transport", scope: "city" },
+      { id: "M2", direction: "transport", scope: "city" },
+      { id: "M4", direction: "ecology", scope: "city" },
+      { id: "M7", direction: "social", scope: "city" },
+      { id: "M10", direction: "safety", scope: "city" },
+      { id: "M12", direction: "services", scope: "city" },
+    ];
+    const simulator = (input: ScenarioInput): SimulationResult => {
+      const includesM1 = input.selections.some((item) => item.measureId === "M1");
+      const base = resultFor(input);
+      return {
+        ...base,
+        criticalAfter: includesM1 ? 0 : 2,
+        scoreAfter: includesM1 ? 51 : 99,
+      };
+    };
+
+    const result = searchScenarios(
+      {
+        objective: "reduce_critical_indicators",
+        focusIndicators: [],
+        reduceCritical: true,
+      },
+      simulator,
+      measures,
+    );
+
+    expect(result.candidates[0].result.criticalAfter).toBe(0);
+    expect(result.candidates[0].selections).toContainEqual({ measureId: "M1" });
+  });
+
+  it("prioritizes the weakest district for balanced_development", () => {
+    const measures: MeasureSearchDefinition[] = [
+      { id: "M1", direction: "transport", scope: "city" },
+      { id: "M2", direction: "transport", scope: "city" },
+      { id: "M4", direction: "ecology", scope: "city" },
+      { id: "M7", direction: "social", scope: "city" },
+      { id: "M10", direction: "safety", scope: "city" },
+      { id: "M12", direction: "services", scope: "city" },
+    ];
+    const simulator = (input: ScenarioInput): SimulationResult => {
+      const includesM1 = input.selections.some((item) => item.measureId === "M1");
+      const base = resultFor(input);
+      return {
+        ...base,
+        scoreAfter: includesM1 ? 51 : 99,
+        districts: base.districts.map((district) =>
+          district.districtId === "nura"
+            ? { ...district, scoreAfter: includesM1 ? 60 : 40 }
+            : district,
+        ),
+      };
+    };
+
+    const result = searchScenarios(
+      {
+        objective: "balanced_development",
+        focusIndicators: [],
+        reduceCritical: false,
+      },
+      simulator,
+      measures,
+    );
+
+    expect(result.candidates[0].selections).toContainEqual({ measureId: "M1" });
+  });
+
+  it("rejects obvious conflicts before calling the simulator", () => {
+    const simulator = vi.fn(resultFor);
+    const conflict: MeasureSearchDefinition[] = [
+      { id: "M1", direction: "transport", scope: "city" },
+      { id: "M3", direction: "transport", scope: "city" },
+      { id: "M4", direction: "ecology", scope: "city" },
+      { id: "M7", direction: "social", scope: "city" },
+      { id: "M10", direction: "safety", scope: "city" },
+    ];
+    const directionOverflow: MeasureSearchDefinition[] = [
+      { id: "M1", direction: "transport", scope: "city" },
+      { id: "M2", direction: "transport", scope: "city" },
+      { id: "MX", direction: "transport", scope: "city" },
+      { id: "M4", direction: "ecology", scope: "city" },
+      { id: "M7", direction: "social", scope: "city" },
+    ];
+
+    expect(searchScenarios(objective, simulator, conflict).evaluatedScenarios).toBe(0);
+    expect(searchScenarios(objective, simulator, directionOverflow).evaluatedScenarios).toBe(0);
+    expect(simulator).not.toHaveBeenCalled();
+  });
 });

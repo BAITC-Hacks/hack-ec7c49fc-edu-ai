@@ -16,13 +16,35 @@ export interface AdvisorResponse {
   explanation: string;
 }
 
-function baselineCriticalIndicators(candidates: readonly ScenarioCandidate[]): string[] {
+const DISTRICT_NAMES: Record<NonNullable<StructuredObjective["districtId"]>, string> = {
+  esil: "Esil",
+  almaty: "Almaty",
+  saryarka: "Saryarka",
+  baikonur: "Baikonur",
+  nura: "Nura",
+};
+
+function baselineCriticalIndicators(
+  candidates: readonly ScenarioCandidate[],
+  objective: StructuredObjective,
+): string[] {
   const baseline = candidates[0]?.result.districts ?? [];
-  return baseline.flatMap((district) =>
-    district.indicators
-      .filter((indicator) => indicator.before < 40)
-      .map((indicator) => `${district.districtId}.${indicator.indicator}`),
-  );
+  const indicators = baseline
+    .filter((district) => !objective.districtId || district.districtId === objective.districtId)
+    .flatMap((district) => district.indicators)
+    .filter(
+      (indicator) =>
+        indicator.before < 40 &&
+        (objective.focusIndicators.length === 0 ||
+          objective.focusIndicators.includes(indicator.indicator)),
+    )
+    .map((indicator) => indicator.indicator);
+  return [...new Set(indicators)];
+}
+
+function joinIndicators(indicators: readonly string[]): string {
+  if (indicators.length < 2) return indicators.join("");
+  return `${indicators.slice(0, -1).join(", ")} and ${indicators.at(-1)}`;
 }
 
 export async function advise(
@@ -31,14 +53,14 @@ export async function advise(
 ): Promise<AdvisorResponse> {
   const interpretedGoal = await interpretObjective(request.message);
   const search = searchScenarios(interpretedGoal, simulateScenario);
-  const critical = baselineCriticalIndicators(search.candidates);
+  const critical = baselineCriticalIndicators(search.candidates, interpretedGoal);
   const trace = [
     interpretedGoal.districtId
-      ? `Analyzed ${interpretedGoal.districtId} baseline`
+      ? `Analyzed ${DISTRICT_NAMES[interpretedGoal.districtId]} baseline`
       : "Analyzed city baseline",
     critical.length > 0
-      ? `Found critical indicators: ${critical.join(", ")}`
-      : "Found no critical baseline indicators",
+      ? `Identified ${joinIndicators(critical)} as critical`
+      : "Identified no critical indicators in the requested focus",
     `Evaluated ${search.validScenarios} valid scenarios`,
     `Selected ${search.candidates.length} alternatives`,
   ];
