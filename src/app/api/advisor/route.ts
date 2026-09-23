@@ -14,9 +14,6 @@ const DISTRICT_IDS: readonly DistrictId[] = [
   "baikonur",
   "nura",
 ];
-const SIMULATION_STUB_ERROR =
-  "Simulation engine is not implemented yet. Merge feat/simulation-engine first.";
-
 function isCurrentScenario(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const selections = (value as Record<string, unknown>).selections;
@@ -65,14 +62,8 @@ export function createAdvisorPost(advisorRunner: AdvisorRunner = runAdvisor) {
     try {
       const result = await advisorRunner({ ...body, message: body.message.trim() });
       return NextResponse.json(result);
-    } catch (error) {
-      if (!(error instanceof Error) || error.message !== SIMULATION_STUB_ERROR) {
-        return NextResponse.json({ error: "Advisor failed." }, { status: 500 });
-      }
-      return NextResponse.json(
-        { error: "Simulation engine is not available yet." },
-        { status: 503 },
-      );
+    } catch {
+      return NextResponse.json({ error: "Advisor failed." }, { status: 500 });
     }
   };
 }
