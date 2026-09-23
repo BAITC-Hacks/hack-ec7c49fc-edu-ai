@@ -2,4 +2,4 @@
 Hackathon team repository for edu_ai
 123
 hako krut
-commit
+commit tokha 
