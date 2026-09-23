@@ -1,6 +1,7 @@
 "use client";
 
-import type { SelectedMeasure } from "@/types/domain";
+import type { SelectedMeasure, SimulationResult } from "@/types/domain";
+import { simulateScenario } from "@/lib/simulation";
 import { MEASURES, type Direction, type DistrictId, type MeasureData } from "@/data/astana-track-data";
 import { districts } from "@/components/dashboard/districts";
 import styles from "./ScenarioBuilder.module.css";
@@ -8,6 +9,7 @@ import styles from "./ScenarioBuilder.module.css";
 type ScenarioBuilderProps = {
   initialDistrictId: DistrictId;
   selections: SelectedMeasure[];
+  preview: SimulationResult;
   onChange: (selections: SelectedMeasure[]) => void;
   onCalculate: () => void;
 };
@@ -20,18 +22,25 @@ const directionLabels: Record<Direction, string> = {
   services: "Сервисы",
 };
 
-export default function ScenarioBuilder({ initialDistrictId, selections, onChange, onCalculate }: ScenarioBuilderProps) {
+export default function ScenarioBuilder({ initialDistrictId, selections, preview, onChange, onCalculate }: ScenarioBuilderProps) {
   const selectedMeasures = selections.flatMap((selection) => {
     const measure = MEASURES.find((item) => item.id === selection.measureId);
     return measure ? [{ measure, districtId: selection.districtId }] : [];
   });
-  const usedBudget = selectedMeasures.reduce((total, item) => total + item.measure.cost, 0);
+  const usedBudget = preview.cost;
+  const proposedSelection = (measure: MeasureData): SelectedMeasure => ({
+    measureId: measure.id, ...(measure.scope === "district" ? { districtId: initialDistrictId } : {}),
+  });
+  const exceedsBudget = (measure: MeasureData) => {
+    const result = simulateScenario({ selections: [...selections, proposedSelection(measure)] });
+    return result.remainingBudget === null || result.remainingBudget < 0;
+  };
 
   const addMeasure = (measure: MeasureData) => {
     if (
       selections.length >= 5
       || selections.some((item) => item.measureId === measure.id)
-      || usedBudget + measure.cost > 100
+      || exceedsBudget(measure)
       || selectedMeasures.filter((item) => item.measure.direction === measure.direction).length >= 2
     ) return;
     onChange([
@@ -65,7 +74,7 @@ export default function ScenarioBuilder({ initialDistrictId, selections, onChang
           {MEASURES.map((measure) => {
             const selected = selections.some((item) => item.measureId === measure.id);
             const directionFull = selectedMeasures.filter((item) => item.measure.direction === measure.direction).length >= 2;
-            const unavailable = !selected && (selections.length >= 5 || usedBudget + measure.cost > 100 || directionFull);
+            const unavailable = !selected && (selections.length >= 5 || exceedsBudget(measure) || directionFull);
             return (
               <article key={measure.id} style={{ display: "flex", minHeight: 175, flexDirection: "column", padding: 14, border: selected ? "1px solid #168c78" : "1px solid #dfe5e9", borderRadius: 5, background: selected ? "#f2faf7" : "#fff" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, color: "#75858e", fontSize: 11 }}>
@@ -97,7 +106,7 @@ export default function ScenarioBuilder({ initialDistrictId, selections, onChang
               <button aria-label={"Удалить " + measure.name} onClick={() => removeMeasure(measure.id)} style={{ gridColumn: 2, border: 0, background: "transparent", color: "#9a5c51", cursor: "pointer" }} type="button">Удалить</button>
             </div>
           ))}
-          <p style={{ marginTop: 18 }}>Осталось бюджета: <strong>{100 - usedBudget} ед.</strong></p>
+          <p style={{ marginTop: 18 }}>Осталось бюджета: <strong>{preview.remainingBudget ?? "—"} ед.</strong></p>
           <button disabled={selections.length !== 5} onClick={onCalculate} style={{ width: "100%", minHeight: 42, border: 0, borderRadius: 4, color: "#fff", background: selections.length === 5 ? "#127d78" : "#bdc7ca", cursor: selections.length === 5 ? "pointer" : "not-allowed" }} type="button">
             {selections.length === 5 ? "Рассчитать сценарий" : "Выберите ещё " + (5 - selections.length)}
           </button>

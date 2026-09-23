@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { searchScenarios } from "@/lib/optimizer/optimizer";
+import { compareCandidateQuality, searchScenarios } from "@/lib/optimizer/optimizer";
 import type { MeasureSearchDefinition, StructuredObjective } from "@/lib/optimizer/types";
 import type { DistrictId, DistrictResult, ScenarioInput, SimulationResult } from "@/types/domain";
 
@@ -65,6 +65,36 @@ const objective: StructuredObjective = {
 };
 
 describe("searchScenarios", () => {
+  it("ranks zero critical indicators above greater district/focus/city gains and cost savings", () => {
+    const base = resultFor({ selections: [{ measureId: "M1" }] });
+    if (!base.valid) throw new Error("Expected valid fixture");
+    const goal: StructuredObjective = { objective: "improve_district", districtId: "nura", focusIndicators: ["S1"], reduceCritical: true };
+    const candidates = [2, 0, 1].map((criticalAfter) => ({ selections: [], result: {
+      ...base, criticalAfter, scoreAfter: 60 + criticalAfter, cost: 100 - criticalAfter,
+      districts: base.districts.map((district) => ({ ...district, scoreDelta: criticalAfter,
+        indicators: [{ indicator: "S1" as const, before: 35, after: 40 + criticalAfter, delta: 5 + criticalAfter }],
+      })),
+    } }));
+    expect([...candidates].sort((a, b) => compareCandidateQuality(a, b, goal)).map((item) => item.result.criticalAfter)).toEqual([0, 1, 2]);
+    expect(compareCandidateQuality(candidates[0], candidates[1], { ...goal, reduceCritical: false })).toBeLessThan(0);
+  });
+
+  it("keeps critical-first search deterministic with distinct strategies", () => {
+    const measures = withTestCost([
+      { id: "M2", direction: "transport", scope: "city" },
+      { id: "M4", direction: "ecology", scope: "city" },
+      { id: "M6", direction: "ecology", scope: "city" },
+      { id: "M8", direction: "social", scope: "city" },
+      { id: "M10", direction: "safety", scope: "city" },
+      { id: "M12", direction: "services", scope: "city" },
+    ]);
+    const goal: StructuredObjective = { objective: "improve_district", districtId: "nura", focusIndicators: ["S1"], reduceCritical: true };
+    const first = searchScenarios(goal, resultFor, measures);
+    expect(searchScenarios(goal, resultFor, measures)).toEqual(first);
+    expect(searchScenarios(goal, resultFor, [...measures].reverse()).candidates.map((item) => item.result)).toEqual(first.candidates.map((item) => item.result));
+    expect(new Set(first.candidates.map((item) => item.selections.map((selection) => selection.measureId).sort().join("|"))).size).toBe(3);
+  });
+
   it("is deterministic and returns three distinct initiative strategies", () => {
     const measures = withTestCost([
       { id: "M1", direction: "transport", scope: "city" },
@@ -110,8 +140,8 @@ describe("searchScenarios", () => {
       measures,
     );
 
-    expect(simulator).toHaveBeenCalledTimes(1);
-    expect(result.evaluatedScenarios).toBe(1);
+    expect(simulator).toHaveBeenCalledTimes(5);
+    expect(result.evaluatedScenarios).toBe(5);
     expect(result.candidates[0].selections).toContainEqual({ measureId: "M1", districtId: "nura" });
   });
 

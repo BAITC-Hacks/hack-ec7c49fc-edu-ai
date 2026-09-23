@@ -1,17 +1,19 @@
 import type { ScenarioCandidate } from "@/types/domain";
 import type { StructuredObjective } from "@/lib/optimizer/types";
+import { describeResult, type CurrentScenarioAnalysis } from "./analysis";
 
 export const OBJECTIVE_INSTRUCTIONS = `You extract a planning objective for Astana.
 Return only the requested structured object. Never propose initiatives and never calculate
 scores, budgets, indicator values, or effects. Use improve_district only when the user names
-a district. Supported districts: esil, almaty, saryarka, baikonur, nura.`;
+a district. Preserve explicit requests to eliminate/reduce critical indicators as
+reduceCritical=true, even for improve_district. Supported districts: esil, almaty, saryarka, baikonur, nura.`;
 
 export function explanationInstructions(): string {
-  return `You explain already-calculated urban planning alternatives.
-Return the requested structured object. For each alternative, write a concise qualitative
-goal-fit statement and trade-off. Do not use digits or number words. Do not calculate,
-infer, round, or restate numeric values. The application will attach all numeric facts itself.
-Use only the supplied facts and keep the array in the supplied alternative order.`;
+  return `Select the most relevant grounded evidence for explaining urban planning alternatives.
+Return only evidence keys for goalFit and tradeoff, never prose or numbers. Use the supplied
+Russian evidence and calculated results, including the current plan when supplied. Do not
+calculate scores, budgets, effects or indicators; do not invent policy risks. Keep candidate
+order. The application renders the chosen evidence verbatim in Russian.`;
 }
 
 export function explanationFormat(candidateCount: number): Record<string, unknown> {
@@ -29,8 +31,8 @@ export function explanationFormat(candidateCount: number): Record<string, unknow
           items: {
             type: "object",
             properties: {
-              goalFit: { type: "string" },
-              tradeoff: { type: "string" },
+              goalFit: { type: "string", enum: ["fit", "improvements", "remaining", "low", "weakest", "budget"] },
+              tradeoff: { type: "string", enum: ["fit", "improvements", "remaining", "low", "weakest", "budget"] },
             },
             required: ["goalFit", "tradeoff"],
             additionalProperties: false,
@@ -46,9 +48,11 @@ export function explanationFormat(candidateCount: number): Record<string, unknow
 export function explanationInput(
   goal: StructuredObjective,
   candidates: readonly ScenarioCandidate[],
+  current?: CurrentScenarioAnalysis,
 ): string {
   const facts = candidates.map((candidate, index) => ({
     alternative: String.fromCharCode(65 + index),
+    evidence: describeResult(candidate.result, goal),
     selections: candidate.selections,
     cost: candidate.result.cost,
     remainingBudget: candidate.result.remainingBudget,
@@ -67,5 +71,5 @@ export function explanationInput(
     })),
   }));
 
-  return JSON.stringify({ goal, calculatedFacts: facts });
+  return JSON.stringify({ goal, calculatedFacts: facts, ...(current ? { currentScenarioAnalysis: current } : {}) });
 }

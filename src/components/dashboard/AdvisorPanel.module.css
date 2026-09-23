@@ -83,7 +83,7 @@
   color: #127d78;
 }
 
-.primary:disabled {
+.primary:disabled, .secondary:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -214,3 +214,10 @@
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+
+.comparison { margin-top: 24px; overflow-x: auto; }
+.comparison h3 { font-size: 17px; }
+.comparison table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.comparison caption { text-align: left; padding-bottom: 12px; color: #62767a; }
+.comparison th, .comparison td { padding: 12px 8px; border-bottom: 1px solid #dfe5e9; text-align: left; }
+.comparison td { font-variant-numeric: tabular-nums; white-space: nowrap; }

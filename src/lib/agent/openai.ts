@@ -1,3 +1,5 @@
+import "server-only";
+
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
 interface ResponsePayload {
@@ -32,7 +34,8 @@ export async function createOpenAIResponse(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+      model: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
+      store: false,
       instructions,
       input,
       ...(format ? { text: { format } } : {}),

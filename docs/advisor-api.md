@@ -11,7 +11,7 @@ interface AdvisorRequest {
 }
 ```
 
-`message` is trimmed, must be non-empty, and may contain at most 2,000 characters. When present, `currentScenario` must match the `ScenarioInput` contract. It is accepted for frontend integration; the current optimizer does not use it to alter ranking.
+`message` is trimmed, must be non-empty, and may contain at most 2,000 characters. When present, `currentScenario` must match the `ScenarioInput` contract. The server runs it through `simulateScenario()` and compares its calculated result with the alternatives. The objective determines ranking; the current plan provides the comparison context.
 
 ```json
 {
@@ -30,10 +30,21 @@ interface AdvisorResponse {
   trace: string[];
   candidates: ScenarioCandidate[];
   explanation: string;
+  currentScenarioAnalysis?: CurrentScenarioAnalysis;
 }
 ```
 
 `candidates` contains zero to three valid results. Every numeric field inside a candidate comes directly from `simulateScenario()`.
+
+`currentScenarioAnalysis` is present only when `currentScenario` is supplied. Its type is exported from `src/lib/agent/analysis.ts`:
+
+- `result`: the exact current `SimulationResult` from the engine, including validation diagnostics for an invalid plan.
+- `strengths`, `weaknesses`: deterministic Russian statements grounded in that result.
+- `remainingCriticalIndicators`, `lowImprovementIndicators`: district IDs with original `IndicatorDelta` values.
+- `comparisons`: one per alternative, with `alternative`, `assessment` (`better`, `worse`, `equivalent`), `advantages`, `tradeoffs`, and `budgetEfficiency`.
+- `summary`: readable current-plan analysis. It is also included in the existing `explanation` string, so older clients still display it.
+
+Invalid current plans have no outcome comparisons; candidates can still be returned. No per-measure causal budget efficiency is inferred. Explicit critical-reduction goals rank before district/focus/Score/cost. All model explanation output is validated as evidence keys; only server-computed Russian facts are rendered.
 
 ## Errors
 

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DistrictId, ScenarioCandidate, SelectedMeasure, SimulationResult } from "@/types/domain";
-import { MEASURES } from "@/data/astana-track-data";
 import { getBaseline, simulateScenario } from "@/lib/simulation";
 import ScenarioBuilder from "@/components/scenario/ScenarioBuilder";
 import SimulationResults from "./SimulationResults";
 import AdvisorPanel from "./AdvisorPanel";
-import { districts, indicators, totalBudget } from "./districts";
+import { districts, indicators } from "./districts";
 import styles from "./dashboard.module.css";
 
 const numberFormat = new Intl.NumberFormat("ru-RU", {
@@ -21,9 +20,10 @@ export default function Dashboard() {
   const [selectedDistrictId, setSelectedDistrictId] = useState<DistrictId>("nura");
   const [selections, setSelections] = useState<SelectedMeasure[]>([]);
   const [advisorCandidate, setAdvisorCandidate] = useState<ScenarioCandidate | null>(null);
+  const preview = useMemo(() => simulateScenario({ selections }), [selections]);
   const scenarioSummary = {
     count: selections.length,
-    usedBudget: selections.reduce((total, item) => total + (MEASURES.find((measure) => measure.id === item.measureId)?.cost ?? 0), 0),
+    usedBudget: preview.cost,
   };
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function Dashboard() {
     }
   };
   const selectedDistrict = districts.find((district) => district.id === selectedDistrictId) ?? districts[4];
-  const remainingBudget = totalBudget - scenarioSummary.usedBudget;
+  const remainingBudget = preview.remainingBudget;
   const sortedIndicators = [...indicators].sort(
     (a, b) => selectedDistrict.values[a.id] - selectedDistrict.values[b.id],
   );
@@ -169,9 +169,12 @@ export default function Dashboard() {
             <p className={styles.detailFoot}>Шкала 0–100. Чем выше показатель, тем лучше.</p>
           </section>
         </div>
-        <ScenarioBuilder initialDistrictId={selectedDistrictId} selections={selections} onChange={changeSelections} onCalculate={calculate} />
+        <ScenarioBuilder initialDistrictId={selectedDistrictId} selections={selections} preview={preview} onChange={changeSelections} onCalculate={calculate} />
         <SimulationResults result={result} error={error} selectedDistrictId={selectedDistrictId} />
-        <AdvisorPanel selections={selections} selectedCandidate={advisorCandidate} onCandidateChange={setAdvisorCandidate} />
+        <AdvisorPanel selections={selections} currentResult={calculated} selectedCandidate={advisorCandidate} onCandidateChange={setAdvisorCandidate} onApply={(candidate) => {
+          changeSelections(candidate.selections.map((selection) => ({ ...selection })));
+          document.getElementById("scenario-title")?.scrollIntoView({ block: "start" });
+        }} />
       </div>
     </main>
   );

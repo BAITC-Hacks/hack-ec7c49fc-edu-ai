@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { AdvisorResponse } from "@/lib/agent/advisor";
-import type { ScenarioCandidate, SelectedMeasure } from "@/types/domain";
+import type { ScenarioCandidate, SelectedMeasure, ValidSimulationResult } from "@/types/domain";
 import { simulateScenario } from "@/lib/simulation";
 import { MEASURES } from "@/data/astana-track-data";
 import { districts } from "./districts";
@@ -10,8 +10,10 @@ import styles from "./AdvisorPanel.module.css";
 
 type Props = {
   selections: SelectedMeasure[];
+  currentResult: ValidSimulationResult | null;
   selectedCandidate: ScenarioCandidate | null;
   onCandidateChange: (candidate: ScenarioCandidate | null) => void;
+  onApply: (candidate: ScenarioCandidate) => void;
 };
 
 const format = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -45,14 +47,17 @@ function readResponse(value: unknown): AdvisorResponse {
     };
   });
 
-  return { interpretedGoal: data.interpretedGoal, trace: data.trace, explanation: data.explanation, candidates };
+  return { interpretedGoal: data.interpretedGoal, trace: data.trace, explanation: data.explanation, candidates,
+    ...(data.currentScenarioAnalysis ? { currentScenarioAnalysis: data.currentScenarioAnalysis } : {}),
+  };
 }
 
-export default function AdvisorPanel({ selections, selectedCandidate, onCandidateChange }: Props) {
+export default function AdvisorPanel({ selections, currentResult, selectedCandidate, onCandidateChange, onApply }: Props) {
   const [goal, setGoal] = useState("Улучшить Нуру и устранить критические социальные показатели в пределах бюджета 100.");
   const [status, setStatus] = useState<"idle" | "analyzing" | "result" | "error">("idle");
   const [response, setResponse] = useState<AdvisorResponse | null>(null);
   const [error, setError] = useState("");
+  const [comparing, setComparing] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -61,6 +66,7 @@ export default function AdvisorPanel({ selections, selectedCandidate, onCandidat
     setStatus("idle");
     setResponse(null);
     setError("");
+    setComparing(false);
     onCandidateChange(null);
     return () => {
       requestRef.current?.abort();
@@ -82,7 +88,7 @@ export default function AdvisorPanel({ selections, selectedCandidate, onCandidat
       const res = await fetch("/api/advisor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: goal.trim(), currentScenario: { selections } }),
+        body: JSON.stringify({ message: goal.trim(), ...(currentResult ? { currentScenario: { selections } } : {}) }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -165,7 +171,8 @@ export default function AdvisorPanel({ selections, selectedCandidate, onCandidat
                   </div>
                   <dl className={styles.facts}>
                     <div><dt>Стоимость</dt><dd>{candidate.result.cost} / 100</dd></div>
-                    <div><dt>Критические</dt><dd>{candidate.result.criticalAfter}</dd></div>
+                    <div><dt>Остаток бюджета</dt><dd>{candidate.result.remainingBudget}</dd></div>
+                    <div><dt>Критические</dt><dd>{candidate.result.criticalBefore} → {candidate.result.criticalAfter}</dd></div>
                     <div><dt>Слабейший район</dt><dd>{districts.find((item) => item.id === candidate.result.weakestDistrict)?.name}</dd></div>
                   </dl>
                   <ul className={styles.measures}>
@@ -179,6 +186,35 @@ export default function AdvisorPanel({ selections, selectedCandidate, onCandidat
                   {candidate.reason && <p className={styles.reason}>{candidate.reason}</p>}
                 </label>
               ))}
+            </div>
+          )}
+          {selectedCandidate && (
+            <div className={styles.actions} style={{ marginTop: 20 }}>
+              <button className={styles.secondary} type="button" disabled={!currentResult} onClick={() => setComparing(true)}>
+                Сравнить с моим планом
+              </button>
+              <button className={styles.primary} type="button" onClick={() => onApply(selectedCandidate)}>Использовать этот сценарий</button>
+              {!currentResult && <p className={styles.status}>Для сравнения сначала рассчитайте свой план.</p>}
+            </div>
+          )}
+          {comparing && currentResult && selectedCandidate && (
+            <div className={styles.comparison}>
+              <h3>Мой план и AI-предложение</h3>
+              <table>
+                <caption>Результаты двух сценариев из симулятора</caption>
+                <thead><tr><th scope="col">Показатель</th><th scope="col">Мой план</th><th scope="col">AI</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">Quality of Life Score</th><td>{format.format(currentResult.scoreAfter)}</td><td>{format.format(selectedCandidate.result.scoreAfter)}</td></tr>
+                  <tr><th scope="row">Изменение Score</th><td>{format.format(currentResult.scoreDelta)}</td><td>{format.format(selectedCandidate.result.scoreDelta)}</td></tr>
+                  <tr><th scope="row">Расход бюджета</th><td>{currentResult.cost}</td><td>{selectedCandidate.result.cost}</td></tr>
+                  <tr><th scope="row">Критические показатели</th><td>{currentResult.criticalAfter}</td><td>{selectedCandidate.result.criticalAfter}</td></tr>
+                  <tr><th scope="row">Самый слабый район</th><td>{districts.find((d) => d.id === currentResult.weakestDistrict)?.name}</td><td>{districts.find((d) => d.id === selectedCandidate.result.weakestDistrict)?.name}</td></tr>
+                  {currentResult.districts.map((district) => {
+                    const proposed = selectedCandidate.result.districts.find((item) => item.districtId === district.districtId);
+                    return <tr key={district.districtId}><th scope="row">{districts.find((d) => d.id === district.districtId)?.name}</th><td>{format.format(district.scoreAfter)}</td><td>{proposed ? format.format(proposed.scoreAfter) : "—"}</td></tr>;
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

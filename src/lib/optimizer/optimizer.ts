@@ -1,6 +1,8 @@
 import type { DistrictId, IndicatorDelta, ScenarioCandidate, SelectedMeasure } from "@/types/domain";
+import { simulateScenario as trackSimulator } from "@/lib/simulation/engine";
 import {
   BUDGET,
+  CRITICAL_THRESHOLD,
   MAX_MEASURES_PER_DIRECTION,
   REQUIRED_MEASURE_COUNT,
 } from "@/lib/simulation/constants";
@@ -86,31 +88,24 @@ function compareNumberDescending(left: number, right: number): number {
   return right - left;
 }
 
-function compareCandidates(
+// Shared by search and current-plan analysis; selection IDs do not imply quality.
+export function compareCandidateQuality(
   left: ScenarioCandidate,
   right: ScenarioCandidate,
   objective: StructuredObjective,
 ): number {
-  if (objective.objective === "improve_district") {
+  if (objective.reduceCritical || objective.objective === "reduce_critical_indicators") {
+    const comparison = left.result.criticalAfter - right.result.criticalAfter;
+    if (comparison !== 0) return comparison;
+  }
+
+  if (objective.districtId) {
     const leftDistrict = districtResult(left, objective.districtId);
     const rightDistrict = districtResult(right, objective.districtId);
     const comparison = compareNumberDescending(
       leftDistrict?.scoreDelta ?? Number.NEGATIVE_INFINITY,
       rightDistrict?.scoreDelta ?? Number.NEGATIVE_INFINITY,
     );
-    if (comparison !== 0) return comparison;
-  } else if (objective.objective === "reduce_critical_indicators") {
-    const comparison = left.result.criticalAfter - right.result.criticalAfter;
-    if (comparison !== 0) return comparison;
-  } else if (objective.objective === "balanced_development") {
-    const leftWeakest = districtResult(left, left.result.weakestDistrict)?.scoreAfter ?? 0;
-    const rightWeakest = districtResult(right, right.result.weakestDistrict)?.scoreAfter ?? 0;
-    const comparison = compareNumberDescending(leftWeakest, rightWeakest);
-    if (comparison !== 0) return comparison;
-  }
-
-  if (objective.reduceCritical) {
-    const comparison = left.result.criticalAfter - right.result.criticalAfter;
     if (comparison !== 0) return comparison;
   }
 
@@ -124,11 +119,24 @@ function compareCandidates(
     if (comparison !== 0) return comparison;
   }
 
+  if (objective.objective === "balanced_development") {
+    const leftWeakest = districtResult(left, left.result.weakestDistrict)?.scoreAfter ?? 0;
+    const rightWeakest = districtResult(right, right.result.weakestDistrict)?.scoreAfter ?? 0;
+    const comparison = compareNumberDescending(leftWeakest, rightWeakest);
+    if (comparison !== 0) return comparison;
+  }
+
   const scoreComparison = compareNumberDescending(left.result.scoreAfter, right.result.scoreAfter);
   if (scoreComparison !== 0) return scoreComparison;
-  const costComparison = left.result.cost - right.result.cost;
-  if (costComparison !== 0) return costComparison;
-  return selectionSignature(left.selections).localeCompare(selectionSignature(right.selections));
+  return left.result.cost - right.result.cost;
+}
+
+function compareCandidates(left: ScenarioCandidate, right: ScenarioCandidate, objective: StructuredObjective): number {
+  const quality = compareCandidateQuality(left, right, objective);
+  if (quality !== 0) return quality;
+  const leftKey = selectionSignature(left.selections);
+  const rightKey = selectionSignature(right.selections);
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
 }
 
 function selectionSignature(selections: readonly SelectedMeasure[]): string {
@@ -171,6 +179,7 @@ export function searchScenarios(
   let evaluatedScenarios = 0;
   let validScenarios = 0;
   const bestByStrategy = new Map<string, ScenarioCandidate>();
+  let criticalDistricts: DistrictId[] | undefined;
 
   for (const measure of measures) {
     if (!Number.isFinite(measure.cost) || measure.cost < 0) {
@@ -190,6 +199,9 @@ export function searchScenarios(
     const result = simulateScenario({ selections: scenarioSelections });
     if (!result.valid) return;
     validScenarios += 1;
+    criticalDistricts ??= result.districts
+      .filter((district) => district.indicators.some((indicator) => indicator.before < CRITICAL_THRESHOLD))
+      .map((district) => district.districtId);
 
     const candidate: ScenarioCandidate = { selections: scenarioSelections, result };
     const signature = strategySignature(scenarioSelections);
@@ -205,15 +217,22 @@ export function searchScenarios(
       return DISTRICT_IDS;
     }
 
-    // improve_district ranks target scoreDelta first. District measures only affect their
-    // target and have non-negative score contribution in this track, so placing a
-    // non-conflicting measure elsewhere is dominated. Conflict pairs still branch fully.
+    // Dominance is specific to the shipped track: no clipping, positive district score
+    // contributions, and only M11 can lower an indicator (T1). For a critical-first goal,
+    // also explore every baseline-critical district. M11 and conflict pairs branch fully
+    // to avoid introducing new critical values. Custom simulators/catalogs are exhaustive.
+    if (simulateScenario !== trackSimulator || measures !== OPTIMIZER_MEASURES) return DISTRICT_IDS;
     const belongsToSelectedConflict = SAME_DISTRICT_CONFLICTS.some(
       ([left, right]) =>
         (measure.id === left && selectedIds.has(right)) ||
         (measure.id === right && selectedIds.has(left)),
     );
-    return belongsToSelectedConflict ? DISTRICT_IDS : [objective.districtId];
+    if (belongsToSelectedConflict) return DISTRICT_IDS;
+    if (objective.reduceCritical) {
+      if (!criticalDistricts || measure.id === "M11") return DISTRICT_IDS;
+      return [...new Set([objective.districtId, ...criticalDistricts])];
+    }
+    return [objective.districtId];
   }
 
   function assignTargets(index: number): void {

@@ -1,86 +1,117 @@
 # Astana AI — Urban Decision Intelligence
 
-## Problem
+## Проблема
 
-City decision-makers must distribute a limited budget across transport, ecology, social infrastructure, safety, and public services while understanding how each combination affects districts and the city as a whole.
+Городской управленец распределяет ограниченный бюджет между транспортом, экологией, социальной инфраструктурой, безопасностью и сервисами. До принятия решения важно понять последствия для каждого района и города в целом.
 
-## Solution
+## Решение
 
-Astana AI combines an implemented deterministic simulation engine, a deterministic scenario optimizer, and an AI advisor. The simulator validates and calculates scenarios, the optimizer searches valid alternatives and ranks the Top 3 for the requested objective, and the advisor translates a natural-language goal into a structured objective and explains calculated results. A frontend dashboard is the presentation layer and is maintained separately.
+- **Deterministic simulation engine** проверяет ограничения и рассчитывает последствия сценария.
+- **Scenario optimizer** ищет допустимые комбинации и ранжирует альтернативы под цель пользователя.
+- **AI advisor** интерпретирует запрос, анализирует текущий план и объясняет результаты.
+- **Frontend dashboard** позволяет собрать план, увидеть before/after, сравнить альтернативы и применить предложение к конструктору.
 
-## Core principle
+## Ключевой принцип
 
-The LLM never calculates the Score, budget, indicator effects, synergies, or district results. Every number shown by the advisor comes from `SimulationResult`, produced by the deterministic `simulateScenario()` function. OpenAI is used only to interpret intent and add qualitative explanations; deterministic fallbacks cover both operations.
+LLM не рассчитывает числа. Score, бюджет, значения показателей, эффекты, синергии, критические показатели и районные оценки поступают из `simulateScenario(input: ScenarioInput): SimulationResult`.
 
-## Architecture
+Optimizer сравнивает готовые результаты; стоимость из каталога используется только для отсечения заведомо недопустимых вариантов. AI выбирает акценты среди проверенных фактов, а числовой текст формируется приложением из результатов движка. Frontend отображает результаты и не воспроизводит формулы.
+
+## Архитектура
 
 ```text
 Frontend
   → Advisor API / Scenario Builder
   → Optimizer
   → Simulation Engine
-  → Static Track Dataset
+  → Synthetic Track Dataset
 ```
 
-The public contracts live in `src/types/domain.ts`. Frontend integration details are in [`docs/frontend-integration.md`](docs/frontend-integration.md).
+Ручной конструктор вызывает движок напрямую. Advisor использует `POST /api/advisor`.
+Общие типы: `src/types/domain.ts`; контракт Advisor: [docs/advisor-api.md](docs/advisor-api.md).
 
-## Dataset
+## Данные
 
-- 5 Astana districts
-- 10 quality-of-life indicators
-- 14 available measures across 5 directions
-- Budget: 100 units
-- Exactly 5 unique measures per valid scenario
-- Simulation horizon: 8 quarters
+Источник — синтетический датасет, предоставленный организаторами кейса Astana Innovations «Аким на 5 часов».
 
-## Simulation
+- 5 районов: Есиль, Алматы, Сарыарка, Байконур, Нура.
+- 10 показателей качества жизни.
+- 14 мер в 5 направлениях.
+- Бюджет: 100 условных единиц.
+- Ровно 5 уникальных решений в сценарии.
+- Горизонт: 8 кварталов.
 
-The engine validates measure scope, budget, direction limits, and incompatibilities. It applies lag-adjusted measure effects and defined synergies, clamps indicator values, calculates district scores, and produces the final Astana Quality of Life Score. Invalid scenarios return validation diagnostics and no calculated after-state.
+## Формула симуляции
+
+Эффекты мер корректируются с учётом задержки: `effect × (8 − lag) / 8`. Затем добавляются заданные синергии, а значения показателей ограничиваются диапазоном 0–100. Совместимость, район/город, бюджет и лимит двух мер одного направления проверяются до расчёта.
+
+Районный Score — взвешенная сумма показателей. Средний городской результат учитывает доли населения. Итоговый QoL Score:
+
+```text
+Score = 0.7 × средний районный Score
+      + 0.3 × Score слабейшего района
+      − количество показателей строго ниже 40
+```
+
+Контрольный сценарий: M7, M8, M10 в Нуре; M12 на весь город; M5 в Сарыарке. Движок возвращает стоимость 95, остаток 5, Score 52.55768 → 56.54307 и критические показатели 2 → 0.
 
 ## AI / Agent flow
 
 ```text
-Natural-language objective
+Natural language goal
   → validated structured objective
-  → deterministic scenario search
-  → simulate valid scenarios
-  → rank Top 3
+  → deterministic search
+  → simulate candidates
+  → Top-3
   → grounded explanation
 ```
 
-Supported optimizer objectives are `maximize_city_score`, `improve_district`, `reduce_critical_indicators`, and `balanced_development`.
+Поддерживаются `maximize_city_score`, `improve_district`, `reduce_critical_indicators`, `balanced_development`. При `reduceCritical=true` первично уменьшение числа критических показателей, затем район и целевые показатели, затем общий Score, стоимость и стабильный tie-breaker. Для сбалансированного развития дополнительно приоритетен результат слабейшего района. Top-3 содержит разные наборы мер.
+
+Одинаковая структурированная цель и версия датасета дают одинаковое ранжирование. Интерпретация свободного текста внешней моделью может варьироваться.
+
+## Анализ текущего плана
+
+Если передан `currentScenario`, сервер повторно вызывает настоящий `simulateScenario()` и добавляет необязательное поле `currentScenarioAnalysis`. Анализ содержит исходный `SimulationResult`, сильные стороны, слабые места, оставшиеся критические показатели, минимальные изменения по цели и сравнение с каждой альтернативой. Старые поля ответа сохранены.
+
+Стоимость сравнивается с результатом цели по готовым сценариям; система не приписывает отдельной мере неподтверждённую неэффективность. Невалидный план получает диагностику движка без выдуманного after-state. Русское объяснение и сравнение доступны также без OpenAI.
 
 ## Tech stack
 
-- Next.js 16 with the App Router and Turbopack
-- React 19
-- TypeScript 5
-- Vitest 4
-- OpenAI Responses API via server-side `fetch` (optional)
+Next.js 16 (App Router, Turbopack), React 19, TypeScript 5, Vitest 4. OpenAI Responses API вызывается серверным `fetch`; дополнительный SDK не требуется. Стили — CSS Modules.
 
-## Setup
+## Системные требования
 
-Requirements: Node.js 20+ and npm.
+Node.js >= 20.9.0 и npm. Для разработки и проверки используется корень репозитория.
+
+## Установка
 
 ```bash
 npm install
 ```
 
-Optionally create `.env.local` to enable LLM-based interpretation and qualitative explanations:
+Для воспроизводимой установки по `package-lock.json`:
+
+```bash
+npm ci
+```
+
+Создайте `.env.local` по образцу `.env.example`:
 
 ```dotenv
 OPENAI_API_KEY=...
-# Optional; defaults to gpt-4o-mini
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-The application remains functional without an API key by using deterministic parser and explanation fallbacks.
+Ключ нужен только для внешней модели. Без ключа применяется deterministic fallback. Пустой `OPENAI_MODEL` использует `gpt-4o-mini`. Не используйте префикс `NEXT_PUBLIC_` для ключа и не коммитьте `.env.local`.
 
 ```bash
 npm run dev
 ```
 
-## Tests
+Откройте локальный адрес, показанный Next.js в терминале.
+
+## Проверка
 
 ```bash
 npm test
@@ -88,37 +119,36 @@ npm run typecheck
 npm run build
 ```
 
+`typecheck` сначала создаёт Next.js-типы маршрутов, поэтому работает и без существующей `.next`. Тесты проверяют reference scenario, ограничения, приоритеты optimizer, анализ текущего плана, API errors и fallback при недоступности OpenAI. Тесты модели используют подменённый HTTP и не тратят API-кредиты.
+
 ## Demo flow
 
-1. Show the city baseline.
-2. Select five initiatives.
-3. Run the deterministic simulation.
-4. Show the before/after results.
-5. Ask the AI advisor for an objective.
-6. Review the deterministic Top-3 alternatives.
-7. Compare the current plan with an AI proposal.
+1. Показать baseline: Score 52.56, слабейший район Нура, два критических показателя.
+2. Выбрать пять инициатив контрольного сценария.
+3. Нажать «Рассчитать сценарий».
+4. Показать before/after: около 56.54, бюджет 95, критические 2 → 0.
+5. Спросить AI: «Улучши Нуру и убери критические социальные показатели, не выходя за бюджет 100».
+6. Показать trace, анализ текущего плана и Top-3.
+7. Выбрать альтернативу и нажать «Сравнить с моим планом».
+8. Нажать «Использовать этот сценарий» и пересчитать его в конструкторе.
 
-See the [`90-second demo script`](docs/demo-script.md) and [`demo queries`](docs/demo-queries.md).
+Дополнительные запросы: «Максимизируй общий Astana Quality of Life Score» и «Предложи более сбалансированный сценарий, чтобы не оставить слабый район».
 
-## Limitations
+## Ограничения
 
-- The dataset is synthetic and scoped to the hackathon track.
-- The system is not a forecast of real Astana public policy outcomes.
-- Recommendations are decision-support, not autonomous decisions.
-- A human decision-maker remains responsible for the final choice.
+- Данные синтетические; результаты относятся только к правилам кейса.
+- Это decision-support, не реальный прогноз политики Астаны.
+- При отсутствии ключа, ошибке или таймауте OpenAI используется deterministic fallback.
+- Общегородской поиск перебирает больше вариантов, чем районный, и может занимать заметно больше времени.
+- Финальное решение принимает человек.
+- LLM не является источником числовой истины и не оценивает риски, которых нет в данных симулятора.
 
-## Third-party components
+## Проверка AI жюри
 
-The project uses Next.js, React, TypeScript, Vitest, and their type packages as declared in `package.json`. The optional external service is the OpenAI Responses API. There is no database, authentication provider, or additional runtime service.
-<details>
-<summary>Initial repository notes</summary>
+Основной simulator и полный путь Advisor работают без ключа. Для проверки реального LLM задайте собственный `OPENAI_API_KEY` в `.env.local` и перезапустите сервер. В примере конфигурации ключ пустой; секреты нельзя хранить в репозитории.
 
-```text
-hack-ec7c49fc-edu-ai
-Hackathon team repository for edu_ai
-123
-hako krut2
-commit tokha
-```
+Запросы к Responses API выполняются только на сервере с таймаутом 8 секунд на вызов. Structured output проверяется приложением. Модель интерпретирует цель и выбирает ключи подтверждённых фактов для объяснения; произвольные числа и факты из её текста не отображаются. Успешный fallback сам по себе не доказывает, что внешний API был вызван успешно.
 
-</details>
+## Сторонние компоненты
+
+Next.js, React, React DOM, TypeScript, Vitest, типы Node.js/React/React DOM из `package.json`; необязательный внешний сервис — OpenAI API. Базы данных, аутентификации и иных внешних сервисов нет.

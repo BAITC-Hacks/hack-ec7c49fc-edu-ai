@@ -3,6 +3,7 @@ import { searchScenarios } from "@/lib/optimizer/optimizer";
 import type { SimulateScenario, StructuredObjective } from "@/lib/optimizer/types";
 import { explainCandidates } from "./explanation";
 import { interpretObjective } from "./objective";
+import { analyzeCurrentScenario, type CurrentScenarioAnalysis } from "./analysis";
 
 export interface AdvisorRequest {
   message: string;
@@ -14,6 +15,7 @@ export interface AdvisorResponse {
   trace: string[];
   candidates: ScenarioCandidate[];
   explanation: string;
+  currentScenarioAnalysis?: CurrentScenarioAnalysis;
 }
 
 const DISTRICT_NAMES: Record<NonNullable<StructuredObjective["districtId"]>, string> = {
@@ -52,9 +54,14 @@ export async function advise(
   simulateScenario: SimulateScenario,
 ): Promise<AdvisorResponse> {
   const interpretedGoal = await interpretObjective(request.message);
+  const currentResult = request.currentScenario ? simulateScenario(request.currentScenario) : undefined;
   const search = searchScenarios(interpretedGoal, simulateScenario);
+  const currentScenarioAnalysis = currentResult
+    ? analyzeCurrentScenario(currentResult, interpretedGoal, search.candidates)
+    : undefined;
   const critical = baselineCriticalIndicators(search.candidates, interpretedGoal);
   const trace = [
+    ...(currentResult ? [currentResult.valid ? "Рассчитан и проанализирован текущий план" : "Текущий план не прошёл проверку симулятора"] : []),
     interpretedGoal.districtId
       ? `Analyzed ${DISTRICT_NAMES[interpretedGoal.districtId]} baseline`
       : "Analyzed city baseline",
@@ -64,7 +71,9 @@ export async function advise(
     `Evaluated ${search.validScenarios} valid scenarios`,
     `Selected ${search.candidates.length} alternatives`,
   ];
-  const explanation = await explainCandidates(interpretedGoal, search.candidates);
+  const explanation = await explainCandidates(interpretedGoal, search.candidates, currentScenarioAnalysis);
 
-  return { interpretedGoal, trace, candidates: search.candidates, explanation };
+  return { interpretedGoal, trace, candidates: search.candidates, explanation,
+    ...(currentScenarioAnalysis ? { currentScenarioAnalysis } : {}),
+  };
 }

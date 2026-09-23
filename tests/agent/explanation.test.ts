@@ -53,11 +53,11 @@ describe("fallbackExplanation", () => {
       [candidate],
     );
 
-    expect(explanation).toContain("Cost 95");
-    expect(explanation).toContain("52.56 → 56.50");
-    expect(explanation).toContain("critical indicators 2 → 0");
-    expect(explanation).toContain("baikonur");
-    expect(explanation).toContain("district deltas: nura +6");
+    expect(explanation).toContain("Использует 95");
+    expect(explanation).toContain("52,56 → 56,5");
+    expect(explanation).toContain("Критические показатели: 2 → 0");
+    expect(explanation).toContain("Байконур");
+    expect(explanation).toContain("Изменения по районам: Нура +6");
   });
 
   it("keeps numeric facts deterministic and rejects model-invented numbers", async () => {
@@ -109,6 +109,6 @@ describe("fallbackExplanation", () => {
     );
 
     expect(explanation).not.toContain("999");
-    expect(explanation).toContain("score 52.56 → 56.50");
+    expect(explanation).toContain("Score: 52,56 → 56,5");
   });
 });
