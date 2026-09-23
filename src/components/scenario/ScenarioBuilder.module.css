@@ -1,0 +1,23 @@
+.layout {
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.8fr);
+}
+
+.catalog {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 580px) {
+  .catalog {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .summary {
+    order: -1;
+  }
+}

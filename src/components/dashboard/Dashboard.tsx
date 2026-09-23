@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import type { DistrictId } from "@/types/domain";
+import { useCallback, useState } from "react";
+import type { DistrictId, ScenarioInput, SimulationResult } from "@/types/domain";
+import { getBaseline, simulateScenario } from "@/lib/simulation";
 import ScenarioBuilder from "@/components/scenario/ScenarioBuilder";
-import { baselineScore, districts, indicators, totalBudget } from "./districts";
+import SimulationResults from "./SimulationResults";
+import { districts, indicators, totalBudget } from "./districts";
 import styles from "./dashboard.module.css";
 
 const numberFormat = new Intl.NumberFormat("ru-RU", {
@@ -11,9 +13,24 @@ const numberFormat = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 2,
 });
 
+const baseline = getBaseline();
+
 export default function Dashboard() {
   const [selectedDistrictId, setSelectedDistrictId] = useState<DistrictId>("nura");
   const [scenarioSummary, setScenarioSummary] = useState({ count: 0, usedBudget: 0 });
+  const [result, setResult] = useState<SimulationResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const calculated = result?.valid ? result : null;
+  const clearResult = useCallback(() => { setResult(null); setError(null); }, []);
+  const calculate = (input: ScenarioInput) => {
+    try {
+      setResult(simulateScenario(input));
+      setError(null);
+    } catch {
+      setResult(null);
+      setError("Не удалось рассчитать сценарий. Попробуйте снова.");
+    }
+  };
   const selectedDistrict = districts.find((district) => district.id === selectedDistrictId) ?? districts[4];
   const remainingBudget = totalBudget - scenarioSummary.usedBudget;
   const sortedIndicators = [...indicators].sort(
@@ -32,7 +49,7 @@ export default function Dashboard() {
         </div>
         <div className={styles.headerRight}>
           <span className={styles.liveDot} aria-hidden="true" />
-          Исходное состояние
+          {calculated ? "Сценарий рассчитан" : "Исходное состояние"}
         </div>
       </header>
 
@@ -49,8 +66,8 @@ export default function Dashboard() {
         <section className={styles.metrics} aria-label="Показатели города">
           <div className={styles.scoreMetric}>
             <span className={styles.metricLabel}>ASTANA QUALITY OF LIFE SCORE</span>
-            <div className={styles.bigScore}>{numberFormat.format(baselineScore)}<span> / 100</span></div>
-            <span className={styles.metricHint}>До принятия решений</span>
+            <div className={styles.bigScore}>{numberFormat.format(calculated?.scoreAfter ?? baseline.score)}<span> / 100</span></div>
+            <span className={styles.metricHint}>{calculated ? "После принятия решений" : "До принятия решений"}</span>
           </div>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Бюджет</span>
@@ -64,8 +81,8 @@ export default function Dashboard() {
           </div>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Критические показатели</span>
-            <strong className={styles.criticalNumber}>2</strong>
-            <span className={styles.metricHint}>Школы и поликлиники, Нура</span>
+            <strong className={styles.criticalNumber}>{calculated?.criticalAfter ?? baseline.criticalCount}</strong>
+            <span className={styles.metricHint}>{calculated ? "После реализации плана" : "В исходном состоянии"}</span>
           </div>
         </section>
 
@@ -113,7 +130,7 @@ export default function Dashboard() {
           <section className={styles.detailSection} aria-labelledby="detail-title">
             <div className={styles.detailHead}>
               <div>
-                <span className={styles.detailEyebrow}>ПРОФИЛЬ РАЙОНА</span>
+                <span className={styles.detailEyebrow}>ИСХОДНЫЙ ПРОФИЛЬ РАЙОНА</span>
                 <h2 id="detail-title">{selectedDistrict.name}</h2>
               </div>
               <span className={styles.population}>{selectedDistrict.populationShare}% населения</span>
@@ -141,7 +158,8 @@ export default function Dashboard() {
             <p className={styles.detailFoot}>Шкала 0–100. Чем выше показатель, тем лучше.</p>
           </section>
         </div>
-        <ScenarioBuilder initialDistrictId={selectedDistrictId} onChange={setScenarioSummary} />
+        <ScenarioBuilder initialDistrictId={selectedDistrictId} onChange={setScenarioSummary} onScenarioChange={clearResult} onCalculate={calculate} />
+        <SimulationResults result={result} error={error} selectedDistrictId={selectedDistrictId} />
       </div>
     </main>
   );

@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ScenarioInput } from "@/types/domain";
 import { MEASURES, type Direction, type DistrictId, type MeasureData } from "@/data/astana-track-data";
 import { districts } from "@/components/dashboard/districts";
+import styles from "./ScenarioBuilder.module.css";
 
 type SelectedMeasure = { measure: MeasureData; districtId?: DistrictId };
 
 type ScenarioBuilderProps = {
   initialDistrictId: DistrictId;
   onChange: (summary: { count: number; usedBudget: number }) => void;
+  onScenarioChange: () => void;
+  onCalculate: (input: ScenarioInput) => void;
 };
 
 const directionLabels: Record<Direction, string> = {
@@ -19,13 +23,17 @@ const directionLabels: Record<Direction, string> = {
   services: "Сервисы",
 };
 
-export default function ScenarioBuilder({ initialDistrictId, onChange }: ScenarioBuilderProps) {
+export default function ScenarioBuilder({ initialDistrictId, onChange, onScenarioChange, onCalculate }: ScenarioBuilderProps) {
   const [selections, setSelections] = useState<SelectedMeasure[]>([]);
   const usedBudget = selections.reduce((total, item) => total + item.measure.cost, 0);
 
   useEffect(() => {
     onChange({ count: selections.length, usedBudget });
   }, [onChange, selections.length, usedBudget]);
+
+  useEffect(() => {
+    onScenarioChange();
+  }, [onScenarioChange, selections]);
 
   const addMeasure = (measure: MeasureData) => {
     if (
@@ -59,8 +67,8 @@ export default function ScenarioBuilder({ initialDistrictId, onChange }: Scenari
         </div>
         <strong>{selections.length} / 5</strong>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.65fr) minmax(300px, .8fr)", gap: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+      <div className={styles.layout} style={{ display: "grid", gap: 20 }}>
+        <div className={styles.catalog} style={{ display: "grid", gap: 12 }}>
           {MEASURES.map((measure) => {
             const selected = selections.some((item) => item.measure.id === measure.id);
             return (
@@ -80,7 +88,7 @@ export default function ScenarioBuilder({ initialDistrictId, onChange }: Scenari
             );
           })}
         </div>
-        <aside style={{ padding: 16, background: "#f8faf9", border: "1px solid #e3e8ea", borderRadius: 5 }}>
+        <aside className={styles.summary} style={{ padding: 16, background: "#f8faf9", border: "1px solid #e3e8ea", borderRadius: 5 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, borderBottom: "1px solid #e0e7e8", paddingBottom: 14 }}>
             <div><p style={{ margin: "0 0 8px", color: "#127d78", fontSize: 11, fontWeight: 800 }}>ВАШ ПЛАН</p><strong>{selections.length} / 5 решений</strong></div>
             <strong>{usedBudget} / 100</strong>
@@ -95,7 +103,7 @@ export default function ScenarioBuilder({ initialDistrictId, onChange }: Scenari
             </div>
           ))}
           <p style={{ marginTop: 18 }}>Осталось бюджета: <strong>{100 - usedBudget} ед.</strong></p>
-          <button disabled={selections.length !== 5} style={{ width: "100%", minHeight: 42, border: 0, borderRadius: 4, color: "#fff", background: selections.length === 5 ? "#127d78" : "#bdc7ca", cursor: selections.length === 5 ? "pointer" : "not-allowed" }} type="button">
+          <button disabled={selections.length !== 5} onClick={() => onCalculate({ selections: selections.map(({ measure, districtId }) => ({ measureId: measure.id, ...(districtId ? { districtId } : {}) })) })} style={{ width: "100%", minHeight: 42, border: 0, borderRadius: 4, color: "#fff", background: selections.length === 5 ? "#127d78" : "#bdc7ca", cursor: selections.length === 5 ? "pointer" : "not-allowed" }} type="button">
             {selections.length === 5 ? "Рассчитать сценарий" : "Выберите ещё " + (5 - selections.length)}
           </button>
         </aside>
