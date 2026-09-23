@@ -117,7 +117,7 @@ The project uses Next.js, React, TypeScript, Vitest, and their type packages as 
 hack-ec7c49fc-edu-ai
 Hackathon team repository for edu_ai
 123
-hako krut
+hako krut2
 commit tokha
 ```
 
